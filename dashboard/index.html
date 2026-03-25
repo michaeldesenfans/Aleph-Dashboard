@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aleph Cloud — Competitive Intelligence</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
+  <header class="header">
+    <div class="header-left">
+      <span class="logo">ALEPH</span>
+      <span class="header-divider">|</span>
+      <span class="header-title">Competitive Intelligence</span>
+    </div>
+    <div class="header-right">
+      <span class="live-indicator" id="liveIndicator">
+        <span class="live-dot"></span> LIVE
+      </span>
+      <span class="last-updated" id="lastUpdated">—</span>
+      <button class="run-btn" id="runPipelineBtn" title="Run pipeline now">
+        &#9654; Run Pipeline
+      </button>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════ STATS BAR ═══════════════════════════════ -->
+  <div class="stats-bar">
+    <div class="stat-item">
+      <span class="stat-label">Total Events</span>
+      <span class="stat-value" id="statTotal">—</span>
+    </div>
+    <div class="stat-item critical">
+      <span class="stat-label">Critical</span>
+      <span class="stat-value" id="statCritical">—</span>
+    </div>
+    <div class="stat-item high">
+      <span class="stat-label">High</span>
+      <span class="stat-value" id="statHigh">—</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Last 24h</span>
+      <span class="stat-value" id="statToday">—</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Pipeline</span>
+      <span class="stat-value" id="statPipeline">idle</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ MAIN ════════════════════════════════ -->
+  <main class="main">
+
+    <!-- SIDEBAR: Filters -->
+    <aside class="sidebar">
+      <div class="filter-group">
+        <label class="filter-label">COMPETITOR</label>
+        <div class="filter-chips" id="competitorFilters">
+          <button class="chip active" data-value="">All</button>
+          <button class="chip aws"    data-value="AWS">AWS</button>
+          <button class="chip azure"  data-value="Azure">Azure</button>
+          <button class="chip gcp"    data-value="GCP">GCP</button>
+          <button class="chip ovc"    data-value="OVHcloud">OVH</button>
+          <button class="chip scw"    data-value="Scaleway">Scaleway</button>
+          <button class="chip htz"    data-value="Hetzner">Hetzner</button>
+          <button class="chip do"     data-value="DigitalOcean">DO</button>
+          <button class="chip cw"     data-value="CoreWeave">CoreWeave</button>
+          <button class="chip ion"    data-value="IONOS">IONOS</button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">CATEGORY</label>
+        <div class="filter-chips" id="categoryFilters">
+          <button class="chip active" data-value="">All</button>
+          <button class="chip" data-value="Outage">Outage</button>
+          <button class="chip" data-value="Funding">Funding</button>
+          <button class="chip" data-value="Product Launch">Launch</button>
+          <button class="chip" data-value="Policy">Policy</button>
+          <button class="chip" data-value="News">News</button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">SEVERITY</label>
+        <div class="filter-chips" id="severityFilters">
+          <button class="chip active" data-value="">All</button>
+          <button class="chip sev-critical" data-value="Critical">Critical</button>
+          <button class="chip sev-high"     data-value="High">High</button>
+          <button class="chip sev-medium"   data-value="Medium">Medium</button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">TIME RANGE</label>
+        <div class="filter-chips" id="timeFilters">
+          <button class="chip active" data-value="0">All time</button>
+          <button class="chip" data-value="24">24h</button>
+          <button class="chip" data-value="72">72h</button>
+          <button class="chip" data-value="168">7d</button>
+        </div>
+      </div>
+
+      <!-- Competitor Activity Chart -->
+      <div class="chart-container">
+        <label class="filter-label">ACTIVITY BY COMPETITOR</label>
+        <canvas id="competitorChart" height="220"></canvas>
+      </div>
+
+      <!-- Category Distribution Chart -->
+      <div class="chart-container">
+        <label class="filter-label">BY CATEGORY</label>
+        <canvas id="categoryChart" height="180"></canvas>
+      </div>
+    </aside>
+
+    <!-- FEED: Event Cards -->
+    <section class="feed">
+      <div class="feed-header">
+        <span class="feed-count" id="feedCount">0 events</span>
+      </div>
+      <div id="eventFeed" class="event-list">
+        <div class="empty-state">Loading competitive intelligence...</div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# Aleph Dashboard V2 — Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# --- Web Framework (API Server) ---
+flask==3.1.0
+flask-cors==5.0.0
+
+# --- HTTP & Feeds ---
+requests==2.32.3
+feedparser==6.0.11          # RSS/Atom feed parsing
+
+# --- LLM ---
+openai==1.75.0
+
+# --- Storage ---
+# SQLite is built into Python stdlib — no extra package needed
+
+# --- Scheduling ---
+apscheduler==3.10.4         # In-process cron scheduler
+
+# --- Utilities ---
+python-dotenv==1.0.1        # Load .env file
+tenacity==9.0.0             # Retry logic for API calls
+
+# --- Development ---
+pytest==8.3.5

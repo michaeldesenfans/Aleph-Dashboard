@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALEPH V2.1 — Competitive Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ════════════ VARIABLES ════════════ */
+    :root {
+      --bg-canvas: #0c0d10;
+      --bg-card: #16181d;
+      --bg-surface: #24262b;
+      --bg-outage-bar: #0a0b0e;
+
+      --text-main: #f0f0f5;
+      --text-muted: #8890a5;
+      --text-dim: #555b6e;
+
+      --color-outage: #ff3b3b;
+      --color-launch: #00a3ff;
+      --color-capital: #00ffa3;
+      --color-policy: #ffd600;
+      --color-clear: #00ffa3;
+      --color-degraded: #ffd600;
+
+      --grad-synthesis: linear-gradient(135deg, #00a3ff 0%, #ff0080 100%);
+
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ════════════ TOP APP BAR ════════════ */
+    .top-bar {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background-color: var(--bg-card);
+      border-bottom: 1px solid var(--bg-surface);
+      flex-shrink: 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .brand-logo {
+      font-weight: 700;
+      letter-spacing: 2px;
+      font-size: 1.1rem;
+      background: var(--grad-synthesis);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--color-capital);
+      background: rgba(0, 255, 163, 0.08);
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 255, 163, 0.15);
+    }
+    .pulse-dot {
+      width: 6px; height: 6px;
+      background-color: var(--color-capital);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--color-capital);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--color-capital); }
+      50% { opacity: 0.5; box-shadow: 0 0 2px var(--color-capital); }
+    }
+
+    .top-meta {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+    .top-meta-val { color: var(--text-main); font-weight: 600; font-size: 0.85rem; }
+    .val-critical { color: var(--color-outage); }
+    .val-high { color: var(--color-policy); }
+
+    /* ════════════ MAIN WORKSPACE ════════════ */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════════
+       LEFT PANE — OPERATIONAL AWARENESS
+       ═══════════════════════════════════════════ */
+    .pane-left {
+      width: 48%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--bg-surface);
+      background-color: var(--bg-canvas);
+      overflow: hidden;
+    }
+
+    /* ─── OUTAGE STATUS BAR ─── */
+    .outage-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      background-color: var(--bg-outage-bar);
+      border-bottom: 1px solid var(--bg-surface);
+      flex-shrink: 0;
+    }
+    .outage-bar-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-right: 6px;
+      white-space: nowrap;
+    }
+    .outage-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .outage-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--bg-surface);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-main);
+      transition: all 0.2s;
+    }
+    .outage-chip:hover {
+      border-color: rgba(255,255,255,0.15);
+      background: var(--bg-surface);
+    }
+    .outage-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .outage-dot.clear { background: var(--color-clear); box-shadow: 0 0 6px rgba(0,255,163,0.4); }
+    .outage-dot.degraded { background: var(--color-degraded); box-shadow: 0 0 6px rgba(255,214,0,0.4); animation: pulse-warn 1.5s ease-in-out infinite; }
+    .outage-dot.outage { background: var(--color-outage); box-shadow: 0 0 8px rgba(255,59,59,0.5); animation: pulse-crit 1s ease-in-out infinite; }
+    @keyframes pulse-warn {
+      0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(255,214,0,0.4); }
+      50% { opacity: 0.6; box-shadow: 0 0 2px rgba(255,214,0,0.2); }
+    }
+    @keyframes pulse-crit {
+      0%, 100% { opacity: 1; box-shadow: 0 0 10px rgba(255,59,59,0.6); }
+      50% { opacity: 0.5; box-shadow: 0 0 3px rgba(255,59,59,0.2); }
+    }
+    .outage-region {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      margin-left: 2px;
+    }
+
+    /* ─── CRITICAL HEADLINES ZONE ─── */
+    .headlines-zone {
+      flex-shrink: 0;
+      padding: 20px;
+      border-bottom: 1px solid var(--bg-surface);
+      background: linear-gradient(180deg, rgba(12,13,16,1) 0%, rgba(22,24,29,0.6) 100%);
+    }
+    .headlines-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .headlines-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+    .headlines-nav {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .nav-arrow {
+      width: 28px; height: 28px;
+      background: var(--bg-surface);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      transition: all 0.15s;
+    }
+    .nav-arrow:hover {
+      background: rgba(255,255,255,0.1);
+      color: var(--text-main);
+      border-color: rgba(255,255,255,0.2);
+    }
+    .nav-dots {
+      display: flex;
+      gap: 5px;
+      margin: 0 8px;
+    }
+    .nav-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--bg-surface);
+      transition: all 0.2s;
+    }
+    .nav-dot.active { background: var(--color-launch); box-shadow: 0 0 6px rgba(0,163,255,0.4); }
+
+    /* Hero headline card */
+    .headline-carousel {
+      position: relative;
+      overflow: hidden;
+    }
+    .headline-slide {
+      display: none;
+      animation: fadeSlide 0.35s ease;
+    }
+    .headline-slide.active { display: block; }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-card {
+      background: var(--bg-card);
+      border: 1px solid var(--bg-surface);
+      border-radius: 10px;
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .hero-card.cat-outage::before { background: var(--color-outage); }
+    .hero-card.cat-capital::before { background: var(--color-capital); }
+    .hero-card.cat-launch::before { background: var(--color-launch); }
+    .hero-card.cat-policy::before { background: var(--color-policy); }
+
+    .hero-severity {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
+    }
+    .hero-severity.critical {
+      background: rgba(255, 59, 59, 0.12);
+      color: var(--color-outage);
+      border: 1px solid rgba(255, 59, 59, 0.2);
+    }
+    .hero-severity.high {
+      background: rgba(255, 214, 0, 0.1);
+      color: var(--color-policy);
+      border: 1px solid rgba(255, 214, 0, 0.2);
+    }
+    .hero-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+    .hero-summary {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+    .hero-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .hero-meta {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--text-dim);
+    }
+    .hero-tags {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* ─── TACTICAL FEED ─── */
+    .feed-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .feed-header {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--bg-surface);
+      background: var(--bg-card);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .feed-title {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+    .filters {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+    }
+    .filter-pill {
+      background: var(--bg-surface);
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-size: 0.68rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .filter-pill.active {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    .filter-pill:hover { background: rgba(255,255,255,0.06); }
+
+    .feed-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .feed-scroll::-webkit-scrollbar { width: 4px; }
+    .feed-scroll::-webkit-scrollbar-track { background: transparent; }
+    .feed-scroll::-webkit-scrollbar-thumb { background: var(--bg-surface); border-radius: 2px; }
+
+    .event-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--bg-surface);
+      border-radius: 8px;
+      padding: 14px 16px;
+      transition: border-color 0.2s;
+    }
+    .event-card:hover { border-color: rgba(255,255,255,0.12); }
+    .event-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--text-dim);
+    }
+    .event-title {
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 10px;
+      color: var(--text-main);
+      line-height: 1.4;
+    }
+    .event-tags { display: flex; gap: 6px; }
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      padding: 3px 7px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .tag-outage { background: rgba(255, 59, 59, 0.1); color: var(--color-outage); border: 1px solid rgba(255, 59, 59, 0.2); }
+    .tag-launch { background: rgba(0, 163, 255, 0.1); color: var(--color-launch); border: 1px solid rgba(0, 163, 255, 0.2); }
+    .tag-capital { background: rgba(0, 255, 163, 0.1); color: var(--color-capital); border: 1px solid rgba(0, 255, 163, 0.2); }
+    .tag-policy { background: rgba(255, 214, 0, 0.1); color: var(--color-policy); border: 1px solid rgba(255, 214, 0, 0.2); }
+    .tag-secondary { background: var(--bg-surface); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.06); }
+
+
+    /* ═══════════════════════════════════════════
+       RIGHT PANE — SYNTHESIS ZONE
+       ═══════════════════════════════════════════ */
+    .pane-right {
+      width: 52%;
+      display: flex;
+      flex-direction: column;
+      background-color: var(--bg-canvas);
+      overflow: hidden;
+    }
+    .synthesis-header {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--bg-surface);
+      background: var(--bg-card);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .synthesis-title {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+    .updated-badge {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      color: var(--text-dim);
+    }
+
+    .synthesis-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .synthesis-scroll::-webkit-scrollbar { width: 4px; }
+    .synthesis-scroll::-webkit-scrollbar-track { background: transparent; }
+    .synthesis-scroll::-webkit-scrollbar-thumb { background: var(--bg-surface); border-radius: 2px; }
+
+    /* ─── MACRO TREND CARD ─── */
+    .macro-card {
+      background: linear-gradient(180deg, rgba(22,24,29,0.9) 0%, rgba(12,13,16,1) 100%);
+      border: 1px solid var(--bg-surface);
+      border-top: 2px solid #00a3ff;
+      border-radius: 10px;
+      padding: 22px;
+    }
+    .macro-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .macro-icon {
+      width: 22px; height: 22px;
+      background: var(--grad-synthesis);
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+    }
+    .macro-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+    .macro-body {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    .macro-tags { display: flex; gap: 8px; }
+
+    /* ─── SECTION DIVIDER ─── */
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* ─── COMPETITIVE MOMENTUM RADAR ─── */
+    .momentum-card {
+      background: var(--bg-card);
+      border: 1px solid var(--bg-surface);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .momentum-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .momentum-title {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .time-toggles {
+      display: flex;
+      gap: 4px;
+    }
+    .time-toggle {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .time-toggle.active {
+      background: rgba(255,255,255,0.06);
+      color: var(--text-main);
+      border-color: rgba(255,255,255,0.1);
+    }
+    .time-toggle:hover { color: var(--text-muted); }
+
+    .momentum-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .momentum-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .momentum-name {
+      width: 80px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-main);
+      font-weight: 500;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .momentum-bar-track {
+      flex: 1;
+      height: 20px;
+      background: rgba(255,255,255,0.02);
+      border-radius: 3px;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+    .momentum-seg {
+      height: 100%;
+      transition: width 0.4s ease;
+      position: relative;
+    }
+    .momentum-seg:hover { filter: brightness(1.4); }
+    .seg-product { background: rgba(0, 163, 255, 0.55); }
+    .seg-capital { background: rgba(0, 255, 163, 0.55); }
+    .seg-policy { background: rgba(255, 214, 0, 0.55); }
+    .seg-outage { background: rgba(255, 59, 59, 0.55); }
+    .momentum-count {
+      width: 30px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      text-align: left;
+      flex-shrink: 0;
+    }
+
+    .momentum-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      color: var(--text-dim);
+    }
+    .legend-dot {
+      width: 8px; height: 8px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .momentum-insight {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(0, 163, 255, 0.04);
+      border: 1px solid rgba(0, 163, 255, 0.1);
+      border-radius: 6px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      font-style: italic;
+    }
+    .momentum-insight::before {
+      content: '✧ ';
+      color: var(--color-launch);
+    }
+
+    /* ─── STRATEGIC SIGNALS ─── */
+    .signals-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .signal-item {
+      display: flex;
+      gap: 14px;
+      padding: 14px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--bg-surface);
+      border-radius: 8px;
+      border-left: 4px solid transparent;
+      transition: all 0.2s;
+    }
+    .signal-item:hover {
+      border-color: rgba(255,255,255,0.1);
+      background: rgba(22,24,29,0.9);
+    }
+    .signal-item.type-threat { border-left-color: var(--color-outage); }
+    .signal-item.type-opportunity { border-left-color: var(--color-capital); }
+    .signal-item.type-shift { border-left-color: var(--color-launch); }
+    .signal-item.type-regulatory { border-left-color: var(--color-policy); }
+
+    .signal-icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .signal-icon.threat { background: rgba(255,59,59,0.1); color: var(--color-outage); }
+    .signal-icon.opportunity { background: rgba(0,255,163,0.1); color: var(--color-capital); }
+    .signal-icon.shift { background: rgba(0,163,255,0.1); color: var(--color-launch); }
+    .signal-icon.regulatory { background: rgba(255,214,0,0.1); color: var(--color-policy); }
+
+    .signal-content { flex: 1; min-width: 0; }
+    .signal-type-label {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 3px;
+      font-weight: 600;
+    }
+    .signal-type-label.threat { color: var(--color-outage); }
+    .signal-type-label.opportunity { color: var(--color-capital); }
+    .signal-type-label.shift { color: var(--color-launch); }
+    .signal-type-label.regulatory { color: var(--color-policy); }
+
+    .signal-text {
+      font-size: 0.82rem;
+      color: var(--text-main);
+      line-height: 1.45;
+      margin-bottom: 4px;
+    }
+    .signal-time {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════ TOP APP BAR ════════════ -->
+  <header class="top-bar">
+    <div class="brand">
+      <div class="brand-logo">ALEPH</div>
+      <div class="brand-status">
+        <div class="pulse-dot"></div>
+        PIPELINE LIVE
+      </div>
+    </div>
+    <div class="top-meta">
+      <span>EVENTS <span class="top-meta-val">1,204</span></span>
+      <span>CRITICAL <span class="top-meta-val val-critical">12</span></span>
+      <span>HIGH <span class="top-meta-val val-high">48</span></span>
+    </div>
+  </header>
+
+  <!-- ════════════ MAIN WORKSPACE ════════════ -->
+  <div class="workspace">
+
+    <!-- ═══ LEFT PANE: OPERATIONAL AWARENESS ═══ -->
+    <div class="pane-left">
+
+      <!-- Outage Status Bar -->
+      <div class="outage-bar">
+        <div class="outage-bar-label">CSP Status</div>
+        <div class="outage-chips">
+          <div class="outage-chip">
+            <div class="outage-dot degraded"></div>
+            AWS
+            <span class="outage-region">us-east-1</span>
+          </div>
+          <div class="outage-chip">
+            <div class="outage-dot clear"></div>
+            Azure
+          </div>
+          <div class="outage-chip">
+            <div class="outage-dot clear"></div>
+            GCP
+          </div>
+          <div class="outage-chip">
+            <div class="outage-dot clear"></div>
+            CoreWeave
+          </div>
+          <div class="outage-chip">
+            <div class="outage-dot clear"></div>
+            Oracle
+          </div>
+        </div>
+      </div>
+
+      <!-- Critical Headlines Zone -->
+      <div class="headlines-zone">
+        <div class="headlines-header">
+          <div class="headlines-label">Critical Headlines</div>
+          <div class="headlines-nav">
+            <div class="nav-arrow" onclick="prevSlide()">‹</div>
+            <div class="nav-dots">
+              <div class="nav-dot active" data-idx="0"></div>
+              <div class="nav-dot" data-idx="1"></div>
+              <div class="nav-dot" data-idx="2"></div>
+            </div>
+            <div class="nav-arrow" onclick="nextSlide()">›</div>
+          </div>
+        </div>
+
+        <div class="headline-carousel">
+          <!-- Slide 1 -->
+          <div class="headline-slide active">
+            <div class="hero-card cat-outage">
+              <div class="hero-severity critical">⚠ CRITICAL</div>
+              <div class="hero-title">Increased Error Rates and Latency in us-east-1 (N. Virginia)</div>
+              <div class="hero-summary">AWS reports elevated 5xx error rates and increased P99 latency across multiple services in the us-east-1 region. Impacting EC2, Lambda, and S3 operations. Customer-facing APIs experiencing degraded response times.</div>
+              <div class="hero-footer">
+                <span class="hero-meta">SOURCE: AWS Status • 12:04 PM • TODAY</span>
+                <div class="hero-tags">
+                  <span class="tag tag-outage">[OUTAGE]</span>
+                  <span class="tag tag-secondary">AWS</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Slide 2 -->
+          <div class="headline-slide">
+            <div class="hero-card cat-capital">
+              <div class="hero-severity high">▲ HIGH</div>
+              <div class="hero-title">CoreWeave secures $200M in secondary funding round to expand GPU clusters</div>
+              <div class="hero-summary">Secondary round signals accelerating demand for dedicated GPU infrastructure. CoreWeave expanding into EU and APAC markets, directly challenging hyperscaler AI compute offerings with specialized hardware-first approach.</div>
+              <div class="hero-footer">
+                <span class="hero-meta">SOURCE: TechCrunch • 09:30 AM • TODAY</span>
+                <div class="hero-tags">
+                  <span class="tag tag-capital">[CAPITAL]</span>
+                  <span class="tag tag-secondary">CoreWeave</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Slide 3 -->
+          <div class="headline-slide">
+            <div class="hero-card cat-policy">
+              <div class="hero-severity high">▲ HIGH</div>
+              <div class="hero-title">EU Commission proposes mandatory sovereign compute requirements for AI workloads</div>
+              <div class="hero-summary">Draft regulation would require AI training data and inference for EU citizens to remain within EU-hosted infrastructure. Potential $4B compliance shift for hyperscalers operating transatlantic data flows.</div>
+              <div class="hero-footer">
+                <span class="hero-meta">SOURCE: Reuters • YESTERDAY</span>
+                <div class="hero-tags">
+                  <span class="tag tag-policy">[POLICY]</span>
+                  <span class="tag tag-secondary">Regulatory</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tactical Feed -->
+      <div class="feed-section">
+        <div class="feed-header">
+          <div class="feed-title">All Signals</div>
+          <div class="filters">
+            <div class="filter-pill active">All</div>
+            <div class="filter-pill">AWS</div>
+            <div class="filter-pill">Azure</div>
+            <div class="filter-pill">GCP</div>
+            <div class="filter-pill">CoreWeave</div>
+          </div>
+        </div>
+        <div class="feed-scroll">
+          <div class="event-card">
+            <div class="event-meta">
+              <span>Azure Blog</span>
+              <span>Yesterday</span>
+            </div>
+            <div class="event-title">Announcing General Availability of Azure OpenAI Service new embedded models</div>
+            <div class="event-tags">
+              <span class="tag tag-launch">[LAUNCH]</span>
+              <span class="tag tag-secondary">Product</span>
+            </div>
+          </div>
+          <div class="event-card">
+            <div class="event-meta">
+              <span>GCP PR</span>
+              <span>Yesterday</span>
+            </div>
+            <div class="event-title">Google Cloud announces new sovereign cloud capabilities for European public sector</div>
+            <div class="event-tags">
+              <span class="tag tag-policy">[POLICY]</span>
+              <span class="tag tag-secondary">Regulation</span>
+            </div>
+          </div>
+          <div class="event-card">
+            <div class="event-meta">
+              <span>AWS Blog</span>
+              <span>2 days ago</span>
+            </div>
+            <div class="event-title">Amazon Bedrock adds Anthropic Claude 3.5 Sonnet fine-tuning support</div>
+            <div class="event-tags">
+              <span class="tag tag-launch">[LAUNCH]</span>
+              <span class="tag tag-secondary">AI/ML</span>
+            </div>
+          </div>
+          <div class="event-card">
+            <div class="event-meta">
+              <span>Bloomberg</span>
+              <span>2 days ago</span>
+            </div>
+            <div class="event-title">Oracle reports 46% cloud revenue growth driven by GPU capacity expansion</div>
+            <div class="event-tags">
+              <span class="tag tag-capital">[CAPITAL]</span>
+              <span class="tag tag-secondary">Earnings</span>
+            </div>
+          </div>
+          <div class="event-card">
+            <div class="event-meta">
+              <span>Azure Status</span>
+              <span>3 days ago</span>
+            </div>
+            <div class="event-title">Resolved: Azure AD authentication latency in West Europe region</div>
+            <div class="event-tags">
+              <span class="tag tag-outage">[OUTAGE]</span>
+              <span class="tag tag-secondary">Resolved</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ RIGHT PANE: SYNTHESIS ZONE ═══ -->
+    <div class="pane-right">
+      <div class="synthesis-header">
+        <div class="synthesis-title">Strategic Synthesis</div>
+        <div class="updated-badge">UPDATED: 2 MINS AGO</div>
+      </div>
+
+      <div class="synthesis-scroll">
+
+        <!-- Macro Trend -->
+        <div class="macro-card">
+          <div class="macro-header">
+            <div class="macro-icon">✧</div>
+            <div class="macro-title">Macro Trend: Escalation in GPU Capacity Race</div>
+          </div>
+          <div class="macro-body">
+            Over the last 72 hours, signaling indicates a major push for sovereign and localized compute. CoreWeave's recent $200M funding injection directly correlates with Azure's aggressive GA rollout of embedded OpenAI models, suggesting Azure is attempting to lock in enterprise customers before alt-clouds can deploy their newly funded hardware.
+          </div>
+          <div class="macro-tags">
+            <span class="tag tag-secondary">Confidence: 94%</span>
+            <span class="tag tag-secondary">Impact: High</span>
+          </div>
+        </div>
+
+        <!-- Competitive Momentum Radar -->
+        <div class="section-label">
+          <span>Competitive Momentum</span>
+          <div class="time-toggles">
+            <button class="time-toggle">7d</button>
+            <button class="time-toggle active">30d</button>
+            <button class="time-toggle">90d</button>
+          </div>
+        </div>
+
+        <div class="momentum-card">
+          <div class="momentum-rows">
+            <div class="momentum-row">
+              <div class="momentum-name">AWS</div>
+              <div class="momentum-bar-track">
+                <div class="momentum-seg seg-product" style="width:45%"></div>
+                <div class="momentum-seg seg-capital" style="width:10%"></div>
+                <div class="momentum-seg seg-policy" style="width:15%"></div>
+                <div class="momentum-seg seg-outage" style="width:20%"></div>
+              </div>
+              <div class="momentum-count">34</div>
+            </div>
+            <div class="momentum-row">
+              <div class="momentum-name">Azure</div>
+              <div class="momentum-bar-track">
+                <div class="momentum-seg seg-product" style="width:60%"></div>
+                <div class="momentum-seg seg-capital" style="width:8%"></div>
+                <div class="momentum-seg seg-policy" style="width:12%"></div>
+                <div class="momentum-seg seg-outage" style="width:5%"></div>
+              </div>
+              <div class="momentum-count">42</div>
+            </div>
+            <div class="momentum-row">
+              <div class="momentum-name">GCP</div>
+              <div class="momentum-bar-track">
+                <div class="momentum-seg seg-product" style="width:35%"></div>
+                <div class="momentum-seg seg-capital" style="width:5%"></div>
+                <div class="momentum-seg seg-policy" style="width:25%"></div>
+                <div class="momentum-seg seg-outage" style="width:3%"></div>
+              </div>
+              <div class="momentum-count">21</div>
+            </div>
+            <div class="momentum-row">
+              <div class="momentum-name">CoreWeave</div>
+              <div class="momentum-bar-track">
+                <div class="momentum-seg seg-product" style="width:15%"></div>
+                <div class="momentum-seg seg-capital" style="width:55%"></div>
+                <div class="momentum-seg seg-policy" style="width:2%"></div>
+                <div class="momentum-seg seg-outage" style="width:3%"></div>
+              </div>
+              <div class="momentum-count">18</div>
+            </div>
+            <div class="momentum-row">
+              <div class="momentum-name">Oracle</div>
+              <div class="momentum-bar-track">
+                <div class="momentum-seg seg-product" style="width:20%"></div>
+                <div class="momentum-seg seg-capital" style="width:30%"></div>
+                <div class="momentum-seg seg-policy" style="width:10%"></div>
+                <div class="momentum-seg seg-outage" style="width:5%"></div>
+              </div>
+              <div class="momentum-count">12</div>
+            </div>
+          </div>
+
+          <div class="momentum-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:rgba(0,163,255,0.7)"></div>Product</div>
+            <div class="legend-item"><div class="legend-dot" style="background:rgba(0,255,163,0.7)"></div>Capital</div>
+            <div class="legend-item"><div class="legend-dot" style="background:rgba(255,214,0,0.7)"></div>Policy</div>
+            <div class="legend-item"><div class="legend-dot" style="background:rgba(255,59,59,0.7)"></div>Outage</div>
+          </div>
+
+          <div class="momentum-insight">
+            Azure leads in product velocity (14 launches) while CoreWeave's activity is 73% capital-focused — signaling heavy Q2 infrastructure buildout before competitive product launches.
+          </div>
+        </div>
+
+        <!-- Strategic Signals -->
+        <div class="section-label">
+          <span>Strategic Signals</span>
+          <span style="font-size:0.6rem;color:var(--text-dim)">4 ACTIVE</span>
+        </div>
+
+        <div class="signals-panel">
+          <div class="signal-item type-threat">
+            <div class="signal-icon threat">⚠</div>
+            <div class="signal-content">
+              <div class="signal-type-label threat">THREAT</div>
+              <div class="signal-text">AWS us-east-1 has logged 3 degradation incidents in 7 days — reliability trajectory declining. Customer churn risk may open competitive window.</div>
+              <div class="signal-time">Detected 2h ago • Confidence: 89%</div>
+            </div>
+          </div>
+
+          <div class="signal-item type-opportunity">
+            <div class="signal-icon opportunity">◆</div>
+            <div class="signal-content">
+              <div class="signal-type-label opportunity">OPPORTUNITY</div>
+              <div class="signal-text">CoreWeave's $200M capital raise creates potential partnership window for enterprise GPU capacity. Pre-revenue infrastructure build indicates pricing flexibility.</div>
+              <div class="signal-time">Detected 5h ago • Confidence: 76%</div>
+            </div>
+          </div>
+
+          <div class="signal-item type-shift">
+            <div class="signal-icon shift">↗</div>
+            <div class="signal-content">
+              <div class="signal-type-label shift">SHIFT</div>
+              <div class="signal-text">Azure pivoting aggressively to embedded AI — 4 model GA launches this week. Strategy shift from platform-only to integrated AI-as-default.</div>
+              <div class="signal-time">Detected 12h ago • Confidence: 92%</div>
+            </div>
+          </div>
+
+          <div class="signal-item type-regulatory">
+            <div class="signal-icon regulatory">§</div>
+            <div class="signal-content">
+              <div class="signal-type-label regulatory">REGULATORY</div>
+              <div class="signal-text">3 new sovereign cloud policies detected across EU, Brazil, and India. Data residency compliance landscape shifting — affects CSP expansion roadmaps.</div>
+              <div class="signal-time">Detected 1d ago • Confidence: 85%</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ CAROUSEL SCRIPT ════════════ -->
+  <script>
+    const slides = document.querySelectorAll('.headline-slide');
+    const dots = document.querySelectorAll('.nav-dot');
+    let currentSlide = 0;
+    let autoTimer;
+
+    function showSlide(idx) {
+      slides.forEach(s => s.classList.remove('active'));
+      dots.forEach(d => d.classList.remove('active'));
+      currentSlide = idx;
+      slides[currentSlide].classList.add('active');
+      dots[currentSlide].classList.add('active');
+      resetAutoRotate();
+    }
+
+    function nextSlide() {
+      showSlide((currentSlide + 1) % slides.length);
+    }
+
+    function prevSlide() {
+      showSlide((currentSlide - 1 + slides.length) % slides.length);
+    }
+
+    dots.forEach(dot => {
+      dot.addEventListener('click', () => showSlide(parseInt(dot.dataset.idx)));
+    });
+
+    function resetAutoRotate() {
+      clearInterval(autoTimer);
+      autoTimer = setInterval(nextSlide, 8000);
+    }
+
+    resetAutoRotate();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "aleph-dashboard-v2",
+  "private": true,
+  "version": "2.0.0",
+  "description": "CEO-facing Strategic Competitive Intelligence Dashboard for Aleph Cloud",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "python server/api_server.py",
+    "pipeline": "python tools/run_pipeline.py",
+    "install-py": "pip install -r requirements.txt"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
