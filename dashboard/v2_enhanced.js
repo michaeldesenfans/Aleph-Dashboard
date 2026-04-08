@@ -1,4 +1,4 @@
-const API_BASE = `${window.location.origin}/api/v2`;
+const API_BASE = (window.__ENV__?.API_BASE_URL || window.location.origin) + '/api/v2';
 const state = {
   competitor: '',
   window: '30d',

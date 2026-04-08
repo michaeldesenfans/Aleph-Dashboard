@@ -1,0 +1,20 @@
+services:
+  backend:
+    image: aleph-backend:latest
+    restart: always
+    env_file: .env
+    volumes:
+      - db-data:/app/data
+    expose:
+      - "8080"
+
+  frontend:
+    image: aleph-frontend:latest
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  db-data:

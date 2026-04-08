@@ -1,0 +1,77 @@
+name: Build and deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: |
+          docker build -t aleph-backend:${{ github.run_number }} .
+          mkdir -p build/docker
+          docker save -o build/docker/aleph-backend.tar aleph-backend:${{ github.run_number }}
+
+      - name: Build frontend image
+        run: |
+          docker build -t aleph-frontend:${{ github.run_number }} ./dashboard
+          docker save -o build/docker/aleph-frontend.tar aleph-frontend:${{ github.run_number }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images
+          path: build/docker/
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: https://dashboard.aleph.im
+    steps:
+      - name: Download images
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: ./build/docker
+
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $DEPLOY_HOST > ~/.ssh/known_hosts
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+
+      - name: Transfer and load images
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+        run: |
+          ssh ${DEPLOY_USER}@${DEPLOY_HOST} mkdir -p ${DEPLOY_DIR}
+          rsync -e "ssh -i ~/.ssh/id_rsa" build/docker/aleph-backend.tar ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/aleph-backend.tar
+          rsync -e "ssh -i ~/.ssh/id_rsa" build/docker/aleph-frontend.tar ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/aleph-frontend.tar
+          ssh ${DEPLOY_USER}@${DEPLOY_HOST} "
+            docker load -i ${DEPLOY_DIR}/aleph-backend.tar
+            docker tag aleph-backend:${{ github.run_number }} aleph-backend:latest
+            docker load -i ${DEPLOY_DIR}/aleph-frontend.tar
+            docker tag aleph-frontend:${{ github.run_number }} aleph-frontend:latest
+            docker compose -f ${DEPLOY_DIR}/docker-compose.prod.yml up -d
+            rm -f ${DEPLOY_DIR}/aleph-backend.tar ${DEPLOY_DIR}/aleph-frontend.tar
+          "

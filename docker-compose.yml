@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: .
+    environment:
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-}
+    volumes:
+      - db-data:/app/data
+    expose:
+      - "8080"
+
+  frontend:
+    build: ./dashboard
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  db-data:

@@ -12,7 +12,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 from server.api.v2 import create_v2_blueprint
-from server.config import ADMIN_API_KEY, DASHBOARD_DIR, DISCOVERY_INTERVAL_MINUTES, SERVER_HOST, SERVER_PORT, STATUS_POLL_SECONDS, SYNTHESIS_INTERVAL_MINUTES
+from server.config import ADMIN_API_KEY, CORS_ALLOWED_ORIGINS, DASHBOARD_DIR, DISCOVERY_INTERVAL_MINUTES, SERVER_HOST, SERVER_PORT, STATUS_POLL_SECONDS, SYNTHESIS_INTERVAL_MINUTES
 from server.pipelines.discovery_pipeline import run_discovery_pipeline
 from server.pipelines.orchestrator import run_full_pipeline
 from server.pipelines.status_pipeline import run_status_pipeline
@@ -27,7 +27,8 @@ logging.basicConfig(
 logger = logging.getLogger("aleph.api")
 
 app = Flask(__name__, static_folder=str(DASHBOARD_DIR))
-CORS(app)
+if CORS_ALLOWED_ORIGINS:
+    CORS(app, origins=CORS_ALLOWED_ORIGINS)
 
 _pipeline_state = {"last_run": None, "last_summary": None, "running": False}
 

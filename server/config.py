@@ -35,6 +35,17 @@ DASHBOARD_DIR = ROOT / "dashboard"
 SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
 SERVER_PORT = _env_int("SERVER_PORT", 8080)
 
+# --- CORS ---
+# Comma-separated list of allowed origins, e.g. "https://dashboard.aleph.im,https://admin.aleph.im"
+# Set to "*" to allow all origins (not recommended for production).
+# If unset, CORS is disabled (same-origin only).
+_cors_raw = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+CORS_ALLOWED_ORIGINS: list[str] | None = (
+    None if not _cors_raw
+    else ["*"] if _cors_raw == "*"
+    else [origin.strip() for origin in _cors_raw.split(",") if origin.strip()]
+)
+
 # --- API Keys ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
