@@ -36,7 +36,7 @@ SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
 SERVER_PORT = _env_int("SERVER_PORT", 8080)
 
 # --- CORS ---
-# Comma-separated list of allowed origins, e.g. "https://dashboard.aleph.im,https://admin.aleph.im"
+# Comma-separated list of allowed origins, e.g. "https://marketwatch.aleph.im,https://admin.aleph.im"
 # Set to "*" to allow all origins (not recommended for production).
 # If unset, CORS is disabled (same-origin only).
 _cors_raw = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
