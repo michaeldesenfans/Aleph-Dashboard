@@ -7,15 +7,8 @@ services:
       - ADMIN_API_KEY=${ADMIN_API_KEY:-}
     volumes:
       - db-data:/app/data
-    expose:
-      - "8080"
-
-  frontend:
-    build: ./dashboard
     ports:
-      - "80:80"
-    depends_on:
-      - backend
+      - "8080:8080"
 
 volumes:
   db-data:

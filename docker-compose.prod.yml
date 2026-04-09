@@ -5,16 +5,8 @@ services:
     env_file: .env
     volumes:
       - db-data:/app/data
-    expose:
-      - "8080"
-
-  frontend:
-    image: aleph-frontend:latest
-    restart: always
     ports:
-      - "80:80"
-    depends_on:
-      - backend
+      - "127.0.0.1:8080:8080"
 
 volumes:
   db-data:
