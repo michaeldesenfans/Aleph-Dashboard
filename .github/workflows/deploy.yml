@@ -65,9 +65,9 @@ jobs:
           ssh ${DEPLOY_USER}@${DEPLOY_HOST} mkdir -p ${DEPLOY_DIR}
           rsync -e "ssh -i ~/.ssh/id_rsa" build/docker/aleph-backend.tar ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/aleph-backend.tar
           ssh ${DEPLOY_USER}@${DEPLOY_HOST} "
-          docker load -i ${DEPLOY_DIR}/aleph-backend.tar
-          docker tag aleph-backend:${{ github.run_number }} aleph-backend:latest
-          rm -f ${DEPLOY_DIR}/aleph-backend.tar
+            docker load -i ${DEPLOY_DIR}/aleph-backend.tar
+            docker tag aleph-backend:${{ github.run_number }} aleph-backend:latest
+            rm -f ${DEPLOY_DIR}/aleph-backend.tar
           "
 
       - name: Deploy frontend static files
@@ -78,7 +78,7 @@ jobs:
           API_BASE_URL: ${{ vars.API_BASE_URL }}
         run: |
           rsync -r -e "ssh -i ~/.ssh/id_rsa" dashboard/v2_enhanced.html dashboard/v2_enhanced.js ${DEPLOY_USER}@${DEPLOY_HOST}:${STATIC_DIR}/
-        ssh ${DEPLOY_USER}@${DEPLOY_HOST} "echo 'window.__ENV__ = { API_BASE_URL: \"${API_BASE_URL:-}\" };' > ${STATIC_DIR}/env.js"
+          ssh ${DEPLOY_USER}@${DEPLOY_HOST} "echo 'window.__ENV__ = { API_BASE_URL: \"${API_BASE_URL:-}\" };' > ${STATIC_DIR}/env.js"
 
       - name: Restart backend
         env:
