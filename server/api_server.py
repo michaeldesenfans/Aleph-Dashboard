@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, jsonify, request, send_from_directory
@@ -177,10 +177,12 @@ def _scheduled_synthesis():
 
 
 def start_scheduler():
+    now = datetime.now(timezone.utc)
+    soon = now + timedelta(seconds=5)
     scheduler = BackgroundScheduler()
-    scheduler.add_job(_scheduled_status, "interval", seconds=STATUS_POLL_SECONDS, id="status", replace_existing=True)
-    scheduler.add_job(_scheduled_discovery, "interval", minutes=DISCOVERY_INTERVAL_MINUTES, id="discovery", replace_existing=True)
-    scheduler.add_job(_scheduled_synthesis, "interval", minutes=SYNTHESIS_INTERVAL_MINUTES, id="synthesis", replace_existing=True)
+    scheduler.add_job(_scheduled_status, "interval", seconds=STATUS_POLL_SECONDS, id="status", replace_existing=True, next_run_time=soon)
+    scheduler.add_job(_scheduled_discovery, "interval", minutes=DISCOVERY_INTERVAL_MINUTES, id="discovery", replace_existing=True, next_run_time=soon)
+    scheduler.add_job(_scheduled_synthesis, "interval", minutes=SYNTHESIS_INTERVAL_MINUTES, id="synthesis", replace_existing=True, next_run_time=soon)
     scheduler.start()
     return scheduler
 
