@@ -12,4 +12,4 @@ RUN mkdir -p data
 
 EXPOSE 8080
 
-CMD ["python", "-m", "server.api_server"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--timeout", "120", "server.api_server:app"]

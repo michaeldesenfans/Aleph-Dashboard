@@ -185,9 +185,16 @@ def start_scheduler():
     return scheduler
 
 
+_scheduler = None
+
+
 def create_app():
+    global _scheduler
     init_db()
     app.register_blueprint(create_v2_blueprint(_pipeline_state))
+    if _scheduler is None:
+        _scheduler = start_scheduler()
+        logger.info("Background schedulers started")
     return app
 
 
@@ -195,9 +202,9 @@ create_app()
 
 
 if __name__ == "__main__":
-    scheduler = start_scheduler()
     logger.info("Aleph Dashboard V2 starting on http://%s:%s", SERVER_HOST, SERVER_PORT)
     try:
         app.run(host=SERVER_HOST, port=SERVER_PORT, debug=False, use_reloader=False)
     finally:
-        scheduler.shutdown()
+        if _scheduler:
+            _scheduler.shutdown()
