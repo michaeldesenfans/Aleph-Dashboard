@@ -8,20 +8,68 @@ from datetime import datetime, timezone
 from server.repositories.competitors import get_pinned_competitors
 from server.repositories.discovery import get_budget_snapshot, get_recent_runs
 from server.repositories.events import (
+    get_competitor_activity_matrix,
+    get_distribution_by_type,
     get_headlines,
     get_incident_counts,
+    get_key_evidence_events,
     get_momentum,
     get_recent_event_stats,
+    get_signal_volume_by_day,
     get_watchlist_activity,
+    get_window_stats,
     query_events,
 )
 from server.repositories.status import get_all_provider_status
-from server.services.synthesis import build_momentum_themes, ensure_synthesis
+from server.services.synthesis import (
+    build_momentum_themes,
+    capture_momentum_snapshot,
+    compute_confidence_decomposition,
+    compute_momentum_delta,
+    ensure_synthesis,
+    generate_trend_article,
+)
+from server.repositories.synthesis import get_snapshot_count, get_theme_trajectory
+from server.repositories.events import get_events_for_synthesis
 
 
 from server.repositories.db import get_conn as _get_conn
 
 WINDOW_MAP = {"7d": 7, "30d": 30, "90d": 90}
+
+
+def _fetch_theme_events(window_days: int) -> dict[str, list[dict]]:
+    """Fetch recent events grouped by event_type for AI momentum synthesis."""
+    conn = _get_conn()
+    rows = conn.execute(
+        """
+        SELECT e.event_type, e.title, e.summary, e.severity_label,
+               c.name AS competitor_name, e.metadata_json
+        FROM events e
+        LEFT JOIN competitors c ON c.id = e.competitor_id
+        WHERE e.detected_at >= datetime('now', ?)
+          AND e.lifecycle_status IN ('active', 'resolved')
+        ORDER BY e.severity_score DESC, e.detected_at DESC
+        """,
+        (f"-{window_days} days",),
+    ).fetchall()
+    conn.close()
+    grouped: dict[str, list[dict]] = {}
+    for row in rows:
+        et = row["event_type"] or "news"
+        if et not in grouped:
+            grouped[et] = []
+        if len(grouped[et]) < 8:
+            meta = json.loads(row["metadata_json"] or "{}")
+            grouped[et].append({
+                "title": row["title"],
+                "summary": row["summary"],
+                "severity_label": row["severity_label"],
+                "competitor_name": row["competitor_name"],
+                "source_name": meta.get("source_name") or "",
+                "source_url": meta.get("source_url") or "",
+            })
+    return grouped
 
 
 def _enrich_theme_sources(themes: list[dict], window_days: int):
@@ -231,7 +279,9 @@ def build_momentum(window: str = "30d"):
         competitor_map[slug]["counts"][event_type] = count
         competitor_map[slug]["total_score"] += count
 
-    themes = build_momentum_themes(rows)
+    # Fetch recent events per event_type for AI-enhanced momentum blurbs
+    theme_events = _fetch_theme_events(days)
+    themes = build_momentum_themes(rows, theme_events=theme_events)
     # Enrich themes with source URLs from recent events
     _enrich_theme_sources(themes, days)
     incident_counts = get_incident_counts(window_days=min(days, 30))
@@ -255,9 +305,30 @@ def build_momentum(window: str = "30d"):
             }
         )
 
+    # Capture daily momentum snapshot (deduped by date)
+    capture_momentum_snapshot(themes, window_days=days)
+
+    # Compute theme deltas vs 7 days ago
+    theme_deltas = compute_momentum_delta(themes, lookback_days=7, window_days=days)
+
+    # Window proof data
+    window_stats = get_window_stats(days)
+    total_signals = int(window_stats.get("total_signals") or 0)
+    oldest = window_stats.get("oldest_event")
+    newest = window_stats.get("newest_event")
+    days_with_data = len(get_signal_volume_by_day(days))
+
     return {
         "window": window,
         "days": days,
+        "window_proof": {
+            "window_start": oldest,
+            "window_end": newest,
+            "total_signals_in_window": total_signals,
+            "signals_per_day_avg": round(total_signals / max(days_with_data, 1), 1),
+            "snapshot_count": get_snapshot_count(days),
+        },
+        "theme_deltas": theme_deltas,
         "competitors": list(competitor_map.values()),
         "themes": themes,
         "watchlist": watchlist,
@@ -268,14 +339,89 @@ def build_trend():
     trend, _ = ensure_synthesis()
     if not trend:
         return {}
+    key_datapoints = trend.get("key_datapoints_json") or trend.get("key_datapoints") or "[]"
+    if isinstance(key_datapoints, str):
+        key_datapoints = json.loads(key_datapoints)
     return {
         "title": trend.get("title"),
+        "headline_trend": trend.get("headline_trend"),
+        "why_it_matters": trend.get("why_it_matters"),
+        "key_driver": trend.get("key_driver"),
+        "key_datapoints": key_datapoints,
         "narrative": trend.get("narrative"),
         "confidence": trend.get("confidence"),
         "impact_level": trend.get("impact_level"),
         "window_start": trend.get("window_start"),
         "window_end": trend.get("window_end"),
         "generated_at": trend.get("generated_at"),
+    }
+
+
+def build_trend_article():
+    """Build the full trend article with sections, claim sources, and evidence components."""
+    events = get_events_for_synthesis(limit=60)
+    trend = build_trend()
+
+    article = generate_trend_article(events=events, trend=trend)
+    if not article:
+        article = {"full_article_md": "", "article_sections": [], "generated_at": None}
+
+    # Component A: Key Evidence Timeline
+    key_evidence = get_key_evidence_events(window_days=30, limit=8)
+    article["key_evidence"] = [
+        {
+            "id": ev["id"],
+            "title": ev["title"],
+            "competitor": ev.get("competitor_name") or "",
+            "slug": ev.get("competitor_slug") or "",
+            "event_type": ev.get("event_type") or "news",
+            "severity": ev.get("severity_label") or "Medium",
+            "detected_at": ev.get("detected_at") or "",
+            "source_name": ev.get("source_name") or "",
+            "source_url": ev.get("source_url") or "",
+            "short_label": ev.get("short_label") or "",
+        }
+        for ev in key_evidence
+    ]
+
+    # Component B: Confidence Decomposition
+    article["confidence_decomposition"] = compute_confidence_decomposition(events, trend)
+
+    # Component C: Theme Trajectory
+    article["theme_trajectory"] = get_theme_trajectory(window_days=30, lookback_snapshots=4)
+
+    return article
+
+
+def build_trend_chart_data(window_days: int = 30) -> dict:
+    """Pre-compute chart-ready data for the trend article."""
+    volume = get_signal_volume_by_day(window_days)
+    distribution = get_distribution_by_type(window_days)
+    heatmap = get_competitor_activity_matrix(window_days)
+    window = get_window_stats(window_days)
+
+    total = int(window.get("total_signals") or 0)
+    critical = int(window.get("critical_count") or 0)
+    active_comp = int(window.get("active_competitors") or 0)
+    days_with_data = len(volume)
+    avg_per_day = round(total / max(days_with_data, 1), 1)
+
+    return {
+        "signal_volume_by_day": volume,
+        "distribution_by_type": distribution,
+        "competitor_activity_heatmap": heatmap,
+        "top_statistics": [
+            {"label": f"Total Signals ({window_days}d)", "value": str(total), "delta": "", "direction": "flat"},
+            {"label": "Critical Events", "value": str(critical), "delta": "", "direction": "up" if critical > 0 else "flat"},
+            {"label": "Active Competitors", "value": str(active_comp), "delta": "", "direction": "flat"},
+            {"label": "Avg/Day", "value": str(avg_per_day), "delta": "", "direction": "flat"},
+        ],
+        "window": {
+            "start": window.get("oldest_event"),
+            "end": window.get("newest_event"),
+            "total_signals": total,
+            "days_with_data": days_with_data,
+        },
     }
 
 

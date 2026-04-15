@@ -191,16 +191,22 @@ CREATE INDEX IF NOT EXISTS idx_psh_competitor ON provider_status_history(competi
 CREATE INDEX IF NOT EXISTS idx_psh_observed ON provider_status_history(observed_at DESC);
 
 CREATE TABLE IF NOT EXISTS trend_snapshots (
-    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-    title              TEXT NOT NULL,
-    narrative          TEXT NOT NULL,
-    confidence         REAL DEFAULT 0.5,
-    impact_level       TEXT DEFAULT 'medium',
-    window_start       TEXT,
-    window_end         TEXT,
-    generated_at       TEXT NOT NULL DEFAULT (datetime('now')),
-    evidence_event_ids TEXT DEFAULT '[]',
-    model_version      TEXT DEFAULT 'gpt-4o'
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    title                  TEXT NOT NULL,
+    narrative              TEXT NOT NULL,
+    confidence             REAL DEFAULT 0.5,
+    impact_level           TEXT DEFAULT 'medium',
+    window_start           TEXT,
+    window_end             TEXT,
+    generated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+    evidence_event_ids     TEXT DEFAULT '[]',
+    model_version          TEXT DEFAULT 'gpt-4o',
+    headline_trend         TEXT,
+    why_it_matters         TEXT,
+    key_driver             TEXT,
+    key_datapoints_json    TEXT DEFAULT '[]',
+    full_article_md        TEXT,
+    article_sections_json  TEXT DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS strategic_signals (
@@ -216,4 +222,15 @@ CREATE TABLE IF NOT EXISTS strategic_signals (
 );
 CREATE INDEX IF NOT EXISTS idx_ss_type ON strategic_signals(signal_type);
 CREATE INDEX IF NOT EXISTS idx_ss_detected ON strategic_signals(detected_at DESC);
+
+CREATE TABLE IF NOT EXISTS momentum_snapshots (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_date TEXT NOT NULL,
+    window_days   INTEGER NOT NULL DEFAULT 30,
+    themes_json   TEXT NOT NULL,
+    total_signals INTEGER NOT NULL DEFAULT 0,
+    generated_at  TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ms_date_window
+    ON momentum_snapshots(snapshot_date, window_days);
 """

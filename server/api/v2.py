@@ -13,6 +13,8 @@ from server.read_models.v2 import (
     build_signals,
     build_stats,
     build_trend,
+    build_trend_article,
+    build_trend_chart_data,
 )
 
 
@@ -57,6 +59,14 @@ def create_v2_blueprint(pipeline_state: dict):
     @bp.get("/synthesis/trend")
     def trend():
         return jsonify(build_trend())
+
+    @bp.get("/synthesis/trend/article")
+    def trend_article():
+        return jsonify(build_trend_article())
+
+    @bp.get("/synthesis/trend/chart-data")
+    def trend_chart_data():
+        return jsonify(build_trend_chart_data())
 
     @bp.get("/synthesis/signals")
     def signals():

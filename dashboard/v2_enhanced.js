@@ -211,11 +211,36 @@ function renderEvents(payload) {
   });
 }
 
+// Store trend data for expand/collapse
+state.trendData = null;
+state.trendExpanded = false;
+
+function renderDatapoints(datapoints) {
+  if (!datapoints || !datapoints.length) return '';
+  return `<div class="macro-datapoints">${datapoints.map(dp =>
+    `<span class="datapoint-chip">
+      <span class="dp-value">${escapeHtml(String(dp.value || ''))}</span>
+      <span class="dp-label">${escapeHtml(dp.label || '')}</span>
+      ${dp.source ? `<span class="dp-source">${escapeHtml(dp.source)}</span>` : ''}
+    </span>`
+  ).join('')}</div>`;
+}
+
 function renderTrend(trend) {
   if (!trend || !trend.title) {
     $macro.innerHTML = '<div class="macro-title">Macro Trend unavailable</div>';
     return;
   }
+  state.trendData = trend;
+  state.trendExpanded = false;
+
+  const headlineTrend = trend.headline_trend
+    ? `<div class="macro-thesis">${escapeHtml(trend.headline_trend)}</div>` : '';
+  const whyItMatters = trend.why_it_matters
+    ? `<div class="macro-why">${escapeHtml(trend.why_it_matters)}</div>` : '';
+  const keyDriver = trend.key_driver
+    ? `<span class="tag tag-driver">KEY DRIVER: ${escapeHtml(trend.key_driver)}</span>` : '';
+
   $macro.innerHTML = `
     <div class="macro-head">
       <div class="macro-icon">
@@ -226,14 +251,280 @@ function renderTrend(trend) {
       </div>
       <div class="macro-title">${escapeHtml(trend.title)}</div>
     </div>
+    ${headlineTrend}
+    ${whyItMatters}
     <div class="macro-body">${escapeHtml(trend.narrative || '')}</div>
+    ${renderDatapoints(trend.key_datapoints)}
     <div class="macro-meta">
+      ${keyDriver}
       <span class="tag tag-neutral">Confidence: ${Math.round((trend.confidence || 0) * 100)}%</span>
       <span class="tag tag-neutral">Window: ${escapeHtml(formatRelativeTime(trend.window_start))} → now</span>
       <span class="tag tag-neutral">Impact: ${escapeHtml((trend.impact_level || 'medium').toUpperCase())}</span>
       <span class="tag tag-neutral">AI Generated: ${escapeHtml(formatRelativeTime(trend.generated_at))}</span>
     </div>
+    <div class="macro-expand-toggle" id="macroExpandToggle">CLICK TO EXPLORE ▾</div>
+    <div class="macro-article" id="macroArticle"></div>
   `;
+
+  document.getElementById('macroExpandToggle')?.addEventListener('click', toggleTrendArticle);
+}
+
+function formatMarkdown(md) {
+  if (!md) return '';
+  let html = escapeHtml(md);
+  // Headings
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  // Bold
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Italic
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Links [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+  // Lists
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, match => `<ul>${match}</ul>`);
+  // Paragraphs (double newline)
+  html = html.split(/\n\n+/).map(block => {
+    const trimmed = block.trim();
+    if (trimmed.startsWith('<h2>') || trimmed.startsWith('<h3>') || trimmed.startsWith('<ul>')) return trimmed;
+    if (!trimmed) return '';
+    return `<p>${trimmed}</p>`;
+  }).join('\n');
+  // Single newlines within paragraphs
+  html = html.replace(/<p>([^<]*)\n([^<]*)<\/p>/g, '<p>$1<br>$2</p>');
+  return html;
+}
+
+function renderArticleWithSources(sections) {
+  if (!sections || !sections.length) return '';
+  return sections.map(section => {
+    let html = formatMarkdown(section.body_md || '');
+    // Inject claim highlights with tooltips
+    const claims = section.claims || [];
+    for (const claim of claims) {
+      const claimText = escapeHtml(claim.text || '');
+      if (!claimText) continue;
+      const sourceName = escapeHtml(claim.source_name || '');
+      const sourceUrl = claim.source_url || '';
+      const tooltipHtml = sourceUrl
+        ? `<div class="claim-tooltip">
+            <div class="claim-tooltip-source">${sourceName}</div>
+            <a class="claim-tooltip-url" href="${sourceUrl}" target="_blank" rel="noreferrer">${escapeHtml(safeHostname(sourceUrl))}</a>
+          </div>`
+        : `<div class="claim-tooltip"><div class="claim-tooltip-source">${sourceName}</div></div>`;
+      const replacement = `<span class="claim-highlight">${claimText}${tooltipHtml}</span>`;
+      // Replace first occurrence only
+      const idx = html.indexOf(claimText);
+      if (idx !== -1) {
+        html = html.substring(0, idx) + replacement + html.substring(idx + claimText.length);
+      }
+    }
+    return `<h2>${escapeHtml(section.heading || '')}</h2>${html}`;
+  }).join('');
+}
+
+// ── Component A: Key Evidence Timeline ──
+function renderEvidenceTimeline(keyEvidence, windowStart, windowEnd) {
+  if (!keyEvidence || !keyEvidence.length) return '';
+  const colorMap = {
+    launch: '#00d4ff', funding: '#00ffc8', policy: '#fbbf24',
+    outage: '#ef4444', partnership: '#8b5cf6', pricing: '#d946ef', news: '#6b7280',
+  };
+  const startDate = new Date(windowStart || keyEvidence[keyEvidence.length - 1].detected_at);
+  const endDate = new Date(windowEnd || Date.now());
+  const range = Math.max(endDate - startDate, 86400000);
+  const fmtDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  const w = 700, h = 90, pad = 20, dotR = 6;
+  const axisY = 35;
+  let svgContent = '';
+  // Axis line
+  svgContent += `<line x1="${pad}" y1="${axisY}" x2="${w - pad}" y2="${axisY}" stroke="rgba(0,212,255,0.15)" stroke-width="1"/>`;
+  // Axis labels
+  svgContent += `<text x="${pad}" y="${axisY + 20}" class="evidence-label">${fmtDate(startDate)}</text>`;
+  svgContent += `<text x="${w - pad}" y="${axisY + 20}" class="evidence-label" text-anchor="end">${fmtDate(endDate)}</text>`;
+
+  keyEvidence.forEach((ev, i) => {
+    const evDate = new Date(ev.detected_at);
+    const pct = Math.min(Math.max((evDate - startDate) / range, 0), 1);
+    const x = pad + pct * (w - 2 * pad);
+    const color = colorMap[ev.event_type] || '#00d4ff';
+    const labelY = axisY - 14;
+    // Stagger labels to avoid overlap
+    const labelOffset = (i % 2 === 0) ? -28 : 32;
+    const tickEnd = (i % 2 === 0) ? axisY - 10 : axisY + 10;
+
+    // Tick line
+    svgContent += `<line x1="${x}" y1="${axisY}" x2="${x}" y2="${tickEnd}" stroke="${color}" stroke-width="0.5" opacity="0.4"/>`;
+    // Dot
+    svgContent += `<circle cx="${x}" cy="${axisY}" r="${dotR}" fill="${color}" class="evidence-dot"
+      data-idx="${i}" onclick="window.open('${ev.source_url}','_blank')">
+      <title>${escapeHtml(ev.title)}\n${ev.competitor} | ${ev.severity} | ${fmtDate(evDate)}</title>
+    </circle>`;
+    // Label below/above
+    const textY = axisY + labelOffset;
+    const comp = escapeHtml(ev.competitor || '').substring(0, 12);
+    const label = escapeHtml(ev.short_label || '').substring(0, 25);
+    svgContent += `<text x="${x}" y="${textY}" text-anchor="middle" class="evidence-label">${comp}</text>`;
+    svgContent += `<text x="${x}" y="${textY + 10}" text-anchor="middle" class="evidence-label" style="font-size:7px;opacity:0.7;">${label}</text>`;
+  });
+
+  return `<div class="evidence-timeline">
+    <div class="evidence-timeline-label">KEY EVIDENCE -- 30 DAY WINDOW</div>
+    <svg width="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" style="display:block;overflow:visible;">${svgContent}</svg>
+  </div>`;
+}
+
+// ── Component B: Confidence Decomposition ──
+function renderConfidenceDecomposition(data) {
+  if (!data) return '';
+  const pct = Math.round((data.overall_confidence || 0.5) * 100);
+  const recency = data.evidence_recency || {};
+  const coverage = data.coverage_breadth || {};
+  const newestLabel = recency.newest_days_ago != null ? `${recency.newest_days_ago}d ago` : '?';
+  const oldestLabel = recency.oldest_days_ago != null ? `${recency.oldest_days_ago}d ago` : '?';
+  const recencyPct = Math.max(100 - (recency.newest_days_ago || 0) * 5, 10);
+  const coveragePct = Math.round((coverage.covered || 0) / Math.max(coverage.total_tracked || 17, 1) * 100);
+
+  const metrics = [
+    { label: 'Source Quality', value: `Tier 1 (${data.source_quality_pct || 0}%)`, pct: data.source_quality_pct || 0 },
+    { label: 'Evidence Recency', value: `${newestLabel} - ${oldestLabel}`, pct: recencyPct },
+    { label: 'Coverage Breadth', value: `${coverage.covered || 0} / ${coverage.total_tracked || 17} comps`, pct: coveragePct },
+    { label: 'Signal Agreement', value: `${data.signal_agreement_pct || 0}%`, pct: data.signal_agreement_pct || 0 },
+  ];
+
+  const barsHtml = metrics.map(m => `
+    <div class="confidence-metric">
+      <span class="confidence-metric-label">${escapeHtml(m.label)}</span>
+      <div class="confidence-bar-track">
+        <div class="confidence-bar-fill" style="width:${m.pct}%"></div>
+      </div>
+      <span class="confidence-metric-value">${escapeHtml(m.value)}</span>
+    </div>
+  `).join('');
+
+  const sourcesHtml = (data.source_names || []).map(s =>
+    `<span class="confidence-source-chip">${escapeHtml(s)}</span>`
+  ).join('');
+
+  return `<div class="confidence-panel">
+    <div class="confidence-panel-title">CONFIDENCE DECOMPOSITION -- ${pct}%</div>
+    <div class="confidence-summary">${data.independent_sources || 0} independent sources corroborate thesis</div>
+    ${barsHtml}
+    ${sourcesHtml ? `<div class="confidence-sources">${sourcesHtml}</div>` : ''}
+  </div>`;
+}
+
+// ── Component C: Theme Trajectory ──
+function renderThemeTrajectory(themes) {
+  if (!themes || !themes.length) return '';
+
+  const directionPill = (dir) => {
+    if (dir === 'new') return '<span class="pill-new">NEW</span>';
+    if (dir === 'fading' || dir === 'cooling') return '<span class="pill-fading">FADING</span>';
+    if (dir === 'surging') return '<span class="pill-surging">SURGING</span>';
+    return '';
+  };
+
+  const miniSparkline = (history) => {
+    if (!history || history.length < 2) return '';
+    const maxC = Math.max(...history.map(h => h.count), 1);
+    const w = 80, h = 20;
+    const step = w / (history.length - 1);
+    const points = history.map((pt, i) => {
+      const x = i * step;
+      const y = h - (pt.count / maxC) * h;
+      return `${x},${y}`;
+    }).join(' ');
+    // Area fill
+    const areaPoints = `0,${h} ${points} ${w},${h}`;
+    return `<svg class="trajectory-sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <polygon points="${areaPoints}" fill="rgba(0,212,255,0.08)"/>
+      <polyline points="${points}" stroke="rgba(0,212,255,0.5)" stroke-width="1.5" fill="none"/>
+    </svg>`;
+  };
+
+  const rowsHtml = themes.map(t => {
+    const deltaCls = t.delta_pct > 0 ? 'up' : t.delta_pct < 0 ? 'down' : 'flat';
+    const arrow = t.delta_pct > 0 ? '&#9650;' : t.delta_pct < 0 ? '&#9660;' : '';
+    const deltaLabel = t.delta_pct !== 0 ? `${arrow} ${Math.abs(t.delta_pct)}%` : 'STEADY';
+
+    return `<div class="trajectory-row">
+      <span class="trajectory-name">${escapeHtml(t.subject)}</span>
+      ${miniSparkline(t.history)}
+      <span class="trajectory-delta ${deltaCls}">${deltaLabel}</span>
+      ${directionPill(t.trend_direction)}
+    </div>`;
+  }).join('');
+
+  return `<div class="theme-trajectory">
+    <div class="theme-trajectory-label">THEME TRAJECTORY -- 30D WINDOW</div>
+    ${rowsHtml}
+  </div>`;
+}
+
+async function toggleTrendArticle() {
+  const $article = document.getElementById('macroArticle');
+  const $toggle = document.getElementById('macroExpandToggle');
+  if (!$article || !$toggle) return;
+
+  if (state.trendExpanded) {
+    $article.classList.remove('expanded');
+    $toggle.classList.remove('expanded');
+    $toggle.textContent = 'CLICK TO EXPLORE ▾';
+    state.trendExpanded = false;
+    return;
+  }
+
+  $toggle.textContent = 'LOADING ARTICLE...';
+  $toggle.classList.add('expanded');
+
+  try {
+    const articleData = await fetchJson('/synthesis/trend/article');
+
+    let articleHtml = '';
+    const sections = articleData.article_sections || [];
+
+    // 1. Evidence Timeline — right after thesis
+    if (articleData.key_evidence && articleData.key_evidence.length) {
+      const windowStart = articleData.key_evidence[articleData.key_evidence.length - 1]?.detected_at;
+      const windowEnd = articleData.key_evidence[0]?.detected_at;
+      articleHtml += renderEvidenceTimeline(articleData.key_evidence, windowStart, windowEnd);
+    }
+
+    // 2. First half of article sections
+    const midpoint = Math.ceil(sections.length / 2);
+    if (sections.length) {
+      articleHtml += renderArticleWithSources(sections.slice(0, midpoint));
+    }
+
+    // 3. Theme Trajectory — between analysis sections
+    if (articleData.theme_trajectory && articleData.theme_trajectory.length) {
+      articleHtml += renderThemeTrajectory(articleData.theme_trajectory);
+    }
+
+    // 4. Second half of article sections
+    if (sections.length > midpoint) {
+      articleHtml += renderArticleWithSources(sections.slice(midpoint));
+    } else if (!sections.length && articleData.full_article_md) {
+      articleHtml += formatMarkdown(articleData.full_article_md);
+    }
+
+    // 5. Confidence Decomposition — at the bottom
+    if (articleData.confidence_decomposition) {
+      articleHtml += renderConfidenceDecomposition(articleData.confidence_decomposition);
+    }
+
+    $article.innerHTML = `<div class="macro-article-inner">${articleHtml}</div>`;
+    $article.classList.add('expanded');
+    $toggle.textContent = 'COLLAPSE ▴';
+    state.trendExpanded = true;
+  } catch (err) {
+    console.error('Failed to load trend article:', err);
+    $toggle.textContent = 'CLICK TO EXPLORE ▾';
+    $toggle.classList.remove('expanded');
+  }
 }
 
 function attentionClass(label) {
@@ -244,18 +535,125 @@ function attentionClass(label) {
   return 'attn-active';
 }
 
+function formatExploration(text) {
+  if (!text) return '';
+  // Convert markdown-style bold to HTML
+  let html = escapeHtml(text);
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Highlight parenthetical citations and make them clickable
+  html = html.replace(/\(([^)]{2,60})\)/g, (match, inner) => {
+    // Check if it looks like a citation (not a regular parenthetical)
+    const citationWords = ['source', 'report', '.com', '.org', '.io', '.net'];
+    const lowerInner = inner.toLowerCase();
+    const isCitation = citationWords.some(w => lowerInner.includes(w)) ||
+      /^[A-Z]/.test(inner) && inner.split(' ').length <= 5;
+    if (isCitation) {
+      return `<span class="citation">(${inner})</span>`;
+    }
+    return `(${inner})`;
+  });
+  // Convert double newlines to paragraphs
+  html = html.split(/\n\n+/).map(p => `<p>${p.trim()}</p>`).join('');
+  // Convert single newlines to <br> within paragraphs
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+function openMomentumModal(theme) {
+  const $backdrop = document.getElementById('momentumBackdrop');
+  const $modal = document.getElementById('momentumModal');
+  const $title = document.getElementById('modalThemeTitle');
+  const $meta = document.getElementById('modalThemeMeta');
+  const $blurb = document.getElementById('modalBlurb');
+  const $exploration = document.getElementById('modalExploration');
+  const $sources = document.getElementById('modalSources');
+
+  $title.textContent = theme.subject;
+  $meta.innerHTML = `
+    <span class="attn-badge ${attentionClass(theme.attention)}">${escapeHtml(theme.attention)}</span>
+    ${(theme.competitors || []).map(name => `<span class="csp-tag">${escapeHtml(name)}</span>`).join('')}
+  `;
+  $blurb.textContent = theme.blurb || '';
+
+  if (theme.detailed_exploration) {
+    $exploration.innerHTML = formatExploration(theme.detailed_exploration);
+    $exploration.style.display = '';
+  } else {
+    $exploration.innerHTML = '<p style="color:var(--text-dim);font-style:italic;">Detailed analysis will be available after the next synthesis cycle.</p>';
+    $exploration.style.display = '';
+  }
+
+  const sources = theme.sources || [];
+  $sources.innerHTML = sources.length ? sources.map(s =>
+    `<a class="src-link" href="${s.url}" target="_blank" rel="noreferrer">${SRC_ARROW_SVG} ${escapeHtml(s.name || safeHostname(s.url))}</a>`
+  ).join('') : '';
+  $sources.style.display = sources.length ? '' : 'none';
+
+  $backdrop.classList.add('open');
+  $modal.classList.add('open');
+}
+
+function closeMomentumModal() {
+  document.getElementById('momentumBackdrop').classList.remove('open');
+  document.getElementById('momentumModal').classList.remove('open');
+}
+
+// Wire up modal close handlers
+document.getElementById('momentumBackdrop')?.addEventListener('click', closeMomentumModal);
+document.getElementById('modalClose')?.addEventListener('click', closeMomentumModal);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeMomentumModal();
+});
+
+// Store themes for click handlers
+state.momentumThemes = [];
+
+function renderDeltaBadge(deltas, subject) {
+  if (!deltas || !deltas.length) return '';
+  const d = deltas.find(x => x.subject === subject);
+  if (!d) return '';
+  if (d.is_new) return '<span class="delta-badge delta-new">NEW</span>';
+  if (d.trend_direction === 'dying') return '<span class="delta-badge delta-fading">FADING</span>';
+  if (d.delta === 0) return '';
+  const arrow = d.delta > 0 ? '▲' : '▼';
+  const cls = d.delta > 0 ? 'delta-up' : 'delta-down';
+  const pct = Math.abs(d.delta_pct);
+  return `<span class="delta-badge ${cls}">${arrow} ${pct > 0 ? pct + '% ' : ''}vs 7d</span>`;
+}
+
+function renderWindowProofBar(proof) {
+  if (!proof || !proof.window_start) return '';
+  const start = new Date(proof.window_start);
+  const end = new Date(proof.window_end || Date.now());
+  const fmtDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `<div class="window-proof-bar">
+    <span class="wp-label">← ${escapeHtml(String(Math.round((end - start) / 86400000)))} DAY MOVING WINDOW →</span>
+    <span class="wp-range">${fmtDate(start)} — ${fmtDate(end)}</span>
+    <span class="wp-stats">${proof.total_signals_in_window || 0} signals · ${proof.signals_per_day_avg || 0}/day avg</span>
+  </div>`;
+}
+
 function renderMomentum(momentum) {
   const themes = momentum.themes || [];
+  const deltas = momentum.theme_deltas || [];
+  state.momentumThemes = themes;
   $momentumMeta.textContent = `${themes.length} THEMES TRACKED`;
   if (!themes.length) {
     $momentumList.innerHTML = '<div class="ms-card"><div class="ms-subject">No momentum themes available</div></div>';
     return;
   }
-  $momentumList.innerHTML = themes.map(theme => `
-    <div class="ms-card">
+
+  // Window proof bar
+  const proofHtml = renderWindowProofBar(momentum.window_proof);
+
+  $momentumList.innerHTML = proofHtml + themes.map((theme, idx) => `
+    <div class="ms-card clickable" data-theme-idx="${idx}">
       <div class="ms-top">
         <div class="ms-subject">${escapeHtml(theme.subject)}</div>
-        <span class="attn-badge ${attentionClass(theme.attention)}">${escapeHtml(theme.attention)}</span>
+        <div class="ms-badges">
+          ${renderDeltaBadge(deltas, theme.subject)}
+          <span class="attn-badge ${attentionClass(theme.attention)}">${escapeHtml(theme.attention)}</span>
+        </div>
       </div>
       <div class="ms-csps">
         ${(theme.competitors || []).map(name => `<span class="csp-tag">${escapeHtml(name)}</span>`).join('')}
@@ -264,6 +662,15 @@ function renderMomentum(momentum) {
       ${renderSources(theme.sources)}
     </div>
   `).join('');
+
+  // Attach click handlers to momentum cards
+  $momentumList.querySelectorAll('.ms-card.clickable').forEach(card => {
+    card.addEventListener('click', () => {
+      const idx = Number(card.dataset.themeIdx);
+      const theme = state.momentumThemes[idx];
+      if (theme) openMomentumModal(theme);
+    });
+  });
 
   const watchlist = momentum.watchlist || [];
   $watchlist.innerHTML = watchlist.map(item => `
@@ -334,8 +741,15 @@ function renderSignals(items) {
   }).join('');
 }
 
-function renderUpdated(value) {
-  $updated.textContent = `UPDATED ${formatRelativeTime(value).toUpperCase()}`;
+function renderUpdated(value, windowProof) {
+  let text = `UPDATED ${formatRelativeTime(value).toUpperCase()}`;
+  if (windowProof && windowProof.window_start) {
+    const start = new Date(windowProof.window_start);
+    const end = new Date(windowProof.window_end || Date.now());
+    const fmtDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+    text = `WINDOW: ${fmtDate(start)} → ${fmtDate(end)} · ${windowProof.total_signals_in_window || 0} SIGNALS · ${text}`;
+  }
+  $updated.textContent = text;
 }
 
 async function loadEvents() {
@@ -363,7 +777,7 @@ async function loadDashboard() {
     renderTrend(trend);
     renderMomentum(momentum);
     renderSignals(signals.items || []);
-    renderUpdated(stats.last_updated_at || trend.generated_at);
+    renderUpdated(stats.last_updated_at || trend.generated_at, momentum.window_proof);
     await loadEvents();
   } catch (error) {
     console.error('Dashboard load failed', error);

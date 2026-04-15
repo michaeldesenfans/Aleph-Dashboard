@@ -206,7 +206,7 @@ def get_recent_event_stats(hours: int = 24):
     return dict(row)
 
 
-def get_events_for_synthesis(limit: int = 40, hours: int = 168):
+def get_events_for_synthesis(limit: int = 60, hours: int = 720):
     conn = get_conn()
     rows = conn.execute(
         """
@@ -288,3 +288,133 @@ def get_incident_counts(window_days: int = 7):
 
 def get_latest_events(limit: int = 10):
     return query_events(limit=limit, lifecycle=None)
+
+
+def get_key_evidence_events(window_days: int = 30, limit: int = 8) -> list[dict]:
+    """Return the top N most significant events in the window, with source URLs.
+    Ordered by severity_score DESC, then detected_at DESC."""
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT e.id, e.title, e.event_type, e.severity_label, e.severity_score,
+               e.detected_at, e.metadata_json,
+               c.name AS competitor_name, c.slug AS competitor_slug
+        FROM events e
+        LEFT JOIN competitors c ON c.id = e.competitor_id
+        WHERE e.detected_at >= datetime('now', ?)
+          AND e.lifecycle_status IN ('active', 'resolved')
+          AND e.severity_label IN ('Critical', 'High')
+        ORDER BY e.severity_score DESC, e.detected_at DESC
+        LIMIT ?
+        """,
+        (f"-{window_days} days", limit),
+    ).fetchall()
+    conn.close()
+    result = []
+    for row in rows:
+        r = dict(row)
+        meta = json.loads(r.get("metadata_json") or "{}")
+        r["source_name"] = meta.get("source_name") or ""
+        r["source_url"] = meta.get("source_url") or ""
+        # Create short label from title (first ~40 chars)
+        title = r.get("title") or ""
+        r["short_label"] = title[:40] + ("..." if len(title) > 40 else "")
+        result.append(r)
+    return result
+
+
+def get_signal_volume_by_day(window_days: int = 30) -> list[dict]:
+    """Daily signal count over the window."""
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT date(detected_at) AS date,
+               COUNT(*) AS count,
+               SUM(CASE WHEN severity_label = 'Critical' THEN 1 ELSE 0 END) AS critical
+        FROM events
+        WHERE detected_at >= datetime('now', ?)
+          AND lifecycle_status IN ('active', 'resolved')
+        GROUP BY date(detected_at)
+        ORDER BY date(detected_at)
+        """,
+        (f"-{window_days} days",),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_distribution_by_type(window_days: int = 30) -> list[dict]:
+    """Signal count grouped by event_type."""
+    label_map = {
+        "launch": "Infrastructure Launch",
+        "funding": "Capital Formation",
+        "policy": "Regulatory",
+        "partnership": "Alliances",
+        "pricing": "Pricing",
+        "outage": "Outages",
+        "news": "General Activity",
+    }
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT event_type AS type, COUNT(*) AS count
+        FROM events
+        WHERE detected_at >= datetime('now', ?)
+          AND lifecycle_status IN ('active', 'resolved')
+        GROUP BY event_type
+        ORDER BY count DESC
+        """,
+        (f"-{window_days} days",),
+    ).fetchall()
+    conn.close()
+    return [{"type": r["type"], "count": r["count"], "label": label_map.get(r["type"], r["type"])} for r in rows]
+
+
+def get_competitor_activity_matrix(window_days: int = 30) -> list[dict]:
+    """Competitor × event_type matrix."""
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT c.name AS competitor, c.slug,
+               SUM(CASE WHEN e.event_type = 'launch' THEN 1 ELSE 0 END) AS launch,
+               SUM(CASE WHEN e.event_type = 'funding' THEN 1 ELSE 0 END) AS funding,
+               SUM(CASE WHEN e.event_type = 'policy' THEN 1 ELSE 0 END) AS policy,
+               SUM(CASE WHEN e.event_type = 'partnership' THEN 1 ELSE 0 END) AS partnership,
+               SUM(CASE WHEN e.event_type = 'pricing' THEN 1 ELSE 0 END) AS pricing,
+               SUM(CASE WHEN e.event_type = 'outage' THEN 1 ELSE 0 END) AS outage,
+               SUM(CASE WHEN e.event_type = 'news' THEN 1 ELSE 0 END) AS news,
+               COUNT(e.id) AS total
+        FROM competitors c
+        JOIN events e ON e.competitor_id = c.id
+        WHERE e.detected_at >= datetime('now', ?)
+          AND e.lifecycle_status IN ('active', 'resolved')
+          AND c.is_pinned = 1
+        GROUP BY c.id, c.name, c.slug
+        HAVING total > 0
+        ORDER BY total DESC
+        LIMIT 10
+        """,
+        (f"-{window_days} days",),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_window_stats(window_days: int = 30) -> dict:
+    """Aggregate stats for the synthesis window."""
+    conn = get_conn()
+    row = conn.execute(
+        """
+        SELECT COUNT(*) AS total_signals,
+               MIN(detected_at) AS oldest_event,
+               MAX(detected_at) AS newest_event,
+               SUM(CASE WHEN severity_label = 'Critical' THEN 1 ELSE 0 END) AS critical_count,
+               COUNT(DISTINCT competitor_id) AS active_competitors
+        FROM events
+        WHERE detected_at >= datetime('now', ?)
+          AND lifecycle_status IN ('active', 'resolved')
+        """,
+        (f"-{window_days} days",),
+    ).fetchone()
+    conn.close()
+    return dict(row)
